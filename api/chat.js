@@ -1,5 +1,14 @@
 export default async function handler(req, res) {
 
+  // ===== CORS FIX =====
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(200).send("AI running");
   }
@@ -9,17 +18,16 @@ export default async function handler(req, res) {
     const { message, products = [] } = req.body;
     const lower = message.toLowerCase();
 
-    // ========= لو العميل عاوز ينفذ =========
+    // تحويل لو طلب تنفيذ
     if (
       lower.includes("اطلب") ||
-      lower.includes("عاوز") ||
       lower.includes("شراء") ||
-      lower.includes("order") ||
-      lower.includes("buy")
+      lower.includes("buy") ||
+      lower.includes("order")
     ) {
       return res.status(200).json({
         type: "action",
-        reply: "ممتاز 👌 لتنفيذ الطلب تواصل معنا مباشرة:",
+        reply: "ممتاز 👌 لتنفيذ الطلب تواصل معنا:",
         actions: {
           whatsapp: "https://wa.me/201007797155",
           phone: "tel:01007797155",
@@ -28,7 +36,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ========= البحث في المنتجات =========
+    // اقتراح منتجات
     const matched = products.filter(p =>
       lower.includes(p.name?.toLowerCase()) ||
       lower.includes(p.nameAr?.toLowerCase())
@@ -46,46 +54,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // ========= رد ذكي عام =========
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `
-أنت مساعد مبيعات احترافي لمتجر Summer Garden.
-- لا تذكر أسعار.
-- رشح منتجات.
-- استخدم العربية إذا كان السؤال عربي.
-- هدفك تحويل العميل للشراء.
-`
-          },
-          {
-            role: "user",
-            content: message
-          }
-        ]
-      })
-    });
-
-    const data = await response.json();
-
+    // رد AI عادي
     return res.status(200).json({
       type: "text",
-      reply: data.choices?.[0]?.message?.content || "تواصل معنا عبر واتساب 01007797155"
+      reply: "كيف أقدر أساعدك اليوم؟ 😊"
     });
 
   } catch (e) {
-    console.log(e);
     return res.status(200).json({
       type: "text",
-      reply: "حدث خطأ مؤقت، تواصل معنا عبر واتساب 01007797155"
+      reply: "حدث خطأ مؤقت"
     });
   }
 }
