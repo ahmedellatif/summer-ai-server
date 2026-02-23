@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
 
+  // ===== CORS =====
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -17,7 +18,9 @@ export default async function handler(req, res) {
     const { message, products = [] } = req.body;
     const lower = message.toLowerCase();
 
-    // ====== لو العميل عايز يطلب ======
+    // ===============================
+    // طلب شراء → تحويل واتساب
+    // ===============================
     if (
       lower.includes("اطلب") ||
       lower.includes("شراء") ||
@@ -35,11 +38,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // ====== اقتراح منتجات مباشرة ======
+    // ===============================
+    // البحث في المنتجات
+    // ===============================
     const matched = products.filter(p =>
-      lower.includes(p.name?.toLowerCase()) ||
-      lower.includes(p.nameAr?.toLowerCase()) ||
-      lower.includes(p.serial?.toLowerCase())
+      lower.includes((p.name || "").toLowerCase()) ||
+      lower.includes((p.nameAr || "").toLowerCase()) ||
+      lower.includes((p.serial || "").toLowerCase())
     ).slice(0, 3);
 
     if (matched.length > 0) {
@@ -54,7 +59,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // ====== ذكاء صناعي ======
+    // ===============================
+    // ذكاء صناعي OpenRouter
+    // ===============================
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -68,12 +75,15 @@ export default async function handler(req, res) {
             role: "system",
             content: `
 You are a luxury floral sales assistant for Summer Garden.
-Always be elegant and persuasive.
-If product names are mentioned, suggest matching items.
-Reply in Arabic if user writes Arabic.
+Speak elegantly and help the customer choose products.
+If user writes Arabic reply in Arabic.
+If they ask about flowers suggest items.
 `
           },
-          { role: "user", content: message }
+          {
+            role: "user",
+            content: message
+          }
         ]
       })
     });
@@ -81,7 +91,7 @@ Reply in Arabic if user writes Arabic.
     const data = await response.json();
 
     const reply =
-      data.choices?.[0]?.message?.content ||
+      data?.choices?.[0]?.message?.content ||
       "كيف يمكنني مساعدتك؟";
 
     return res.status(200).json({
@@ -89,10 +99,12 @@ Reply in Arabic if user writes Arabic.
       reply
     });
 
-  } catch (e) {
+  } catch (error) {
+    console.error("AI ERROR:", error);
+
     return res.status(200).json({
       type: "text",
-      reply: "حدث خطأ مؤقت"
+      reply: "حدث خطأ مؤقت في السيرفر"
     });
   }
 }
