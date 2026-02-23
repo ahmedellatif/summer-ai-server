@@ -1,8 +1,7 @@
 export default async function handler(req, res) {
 
-  // ===== CORS FIX =====
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -18,7 +17,7 @@ export default async function handler(req, res) {
     const { message, products = [] } = req.body;
     const lower = message.toLowerCase();
 
-    // تحويل لو طلب تنفيذ
+    // ====== لو العميل عايز يطلب ======
     if (
       lower.includes("اطلب") ||
       lower.includes("شراء") ||
@@ -27,25 +26,26 @@ export default async function handler(req, res) {
     ) {
       return res.status(200).json({
         type: "action",
-        reply: "ممتاز 👌 لتنفيذ الطلب تواصل معنا:",
+        reply: "ممتاز 👌 يمكنك إتمام الطلب عبر:",
         actions: {
           whatsapp: "https://wa.me/201007797155",
           phone: "tel:01007797155",
-          email: "mailto:info@summergarden-eg.com"
+          email: "mailto:sales@summergarden.com"
         }
       });
     }
 
-    // اقتراح منتجات
+    // ====== اقتراح منتجات مباشرة ======
     const matched = products.filter(p =>
       lower.includes(p.name?.toLowerCase()) ||
-      lower.includes(p.nameAr?.toLowerCase())
+      lower.includes(p.nameAr?.toLowerCase()) ||
+      lower.includes(p.serial?.toLowerCase())
     ).slice(0, 3);
 
     if (matched.length > 0) {
       return res.status(200).json({
         type: "products",
-        reply: "رشحنا لك المنتجات التالية 👇",
+        reply: "رشحنا لك هذه المنتجات 👇",
         products: matched.map(p => ({
           name: p.nameAr || p.name,
           image: p.img,
@@ -54,10 +54,39 @@ export default async function handler(req, res) {
       });
     }
 
-    // رد AI عادي
+    // ====== ذكاء صناعي ======
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
+You are a luxury floral sales assistant for Summer Garden.
+Always be elegant and persuasive.
+If product names are mentioned, suggest matching items.
+Reply in Arabic if user writes Arabic.
+`
+          },
+          { role: "user", content: message }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    const reply =
+      data.choices?.[0]?.message?.content ||
+      "كيف يمكنني مساعدتك؟";
+
     return res.status(200).json({
       type: "text",
-      reply: "كيف أقدر أساعدك اليوم؟ 😊"
+      reply
     });
 
   } catch (e) {
